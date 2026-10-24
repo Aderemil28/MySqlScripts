@@ -1,0 +1,9 @@
+# Normalize line endings in the repo; check out Windows scripts with CRLF so
+# SSMS, PowerShell ISE and cmd handle them cleanly.
+* text=auto
+*.sql  text eol=crlf
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.md   text eol=lf

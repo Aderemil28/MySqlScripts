@@ -1,0 +1,14 @@
+# Output files the scripts produce when run from the repo folder
+*.csv
+*.log
+*.trc
+*.bak
+*.trn
+*.zip
+servers.txt
+*_config.csv
+# Editor and OS clutter
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
