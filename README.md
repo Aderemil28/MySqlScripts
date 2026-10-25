@@ -98,6 +98,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | Script | What it does |
 |---|---|
 | [blocking-chain.sql](tsql/monitoring/blocking-chain.sql) | Lead blockers and every blocked request with SQL text |
+| [top-cpu-queries.sql](tsql/monitoring/top-cpu-queries.sql) | Cached queries using the most CPU, with averages, reads, statement text and plan |
 | [sessions-by-database-host-or-program.sql](tsql/monitoring/sessions-by-database-host-or-program.sql) | Who is connected, filtered by database, host, program or login |
 | [cpu-utilization-history.sql](tsql/monitoring/cpu-utilization-history.sql) | SQL Server vs other process CPU, minute by minute for about 4 hours |
 | [cpu-scheduler-pressure.sql](tsql/monitoring/cpu-scheduler-pressure.sql) | Runnable task queues and signal wait percentage |
@@ -132,6 +133,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [add-primary-key-to-heaps.sql](tsql/maintenance/add-primary-key-to-heaps.sql) | Lists tables with no primary key and generates surrogate keys, preview first |
 | [kill-sessions-for-database.sql](tsql/maintenance/kill-sessions-for-database.sql) | Clears connections from a database before a restore or rename |
 | [schema-object-counts.sql](tsql/maintenance/schema-object-counts.sql) | Object counts and row counts to compare source and target after a migration |
+| [find-invalid-xml-in-columns.sql](tsql/maintenance/find-invalid-xml-in-columns.sql) | Finds rows where an XML config column no longer parses as XML |
 | [log-shipping-status.sql](tsql/log-shipping/log-shipping-status.sql) | Last backup, copy and restore with minutes since each |
 
 ### PowerShell
