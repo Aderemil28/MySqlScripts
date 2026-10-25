@@ -55,6 +55,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [ag-sync-lag.sql](tsql/alwayson/ag-sync-lag.sql) | Estimated data loss in seconds per database and secondary |
 | [ag-failover-readiness.sql](tsql/alwayson/ag-failover-readiness.sql) | Pre-checks for a planned failover and prints the failover command |
 | [ag-listeners.sql](tsql/alwayson/ag-listeners.sql) | Listener DNS names, ports, IPs and state |
+| [ag-health-timeouts.sql](tsql/alwayson/ag-health-timeouts.sql) | Health check timeout, failure condition level and lease timeout, with change commands |
 | [ag-automatic-seeding-status.sql](tsql/alwayson/ag-automatic-seeding-status.sql) | Automatic seeding history, failures and live progress |
 | [read-only-routing-url.sql](tsql/alwayson/read-only-routing-url.sql) | Calculates the correct READ_ONLY_ROUTING_URL for an instance |
 | [connection-strings-by-database.sql](tsql/alwayson/connection-strings-by-database.sql) | Suggested connection string per database (listener + MultiSubnetFailover for AG databases) |
@@ -70,7 +71,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [generate-backup-and-restore-commands.sql](tsql/backup-restore/generate-backup-and-restore-commands.sql) | Generates matching BACKUP and RESTORE WITH MOVE commands for migrations and refreshes |
 | [backup-history.sql](tsql/backup-restore/backup-history.sql) | Detailed backup history plus the latest full, diff and log per database |
 | [backup-lsn-chain.sql](tsql/backup-restore/backup-lsn-chain.sql) | LSN chain for one database, to plan a restore or explain a refused one |
-| [backup-restore-progress.sql](tsql/backup-restore/backup-restore-progress.sql) | Percent complete and ETA for running backups, restores and DBCC |
+| [backup-restore-progress.sql](tsql/backup-restore/backup-restore-progress.sql) | Percent complete, ETA, waits and SQL text for running backups, restores and DBCC |
 | [check-backup-file-exists.sql](tsql/backup-restore/check-backup-file-exists.sql) | Confirms SQL Server can see and read a backup file before you restore |
 
 ### T-SQL: Security and logins
@@ -90,6 +91,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [connections-auth-and-encryption.sql](tsql/security/connections-auth-and-encryption.sql) | Kerberos vs NTLM, TLS encryption and client IP for current connections |
 | [encryption-tde-keys-and-certificates.sql](tsql/security/encryption-tde-keys-and-certificates.sql) | TDE status per database, certificate expiry, keys |
 | [clr-assemblies-and-trustworthy.sql](tsql/security/clr-assemblies-and-trustworthy.sql) | CLR settings, TRUSTWORTHY databases and user assemblies |
+| [failed-logins-and-locked-accounts.sql](tsql/security/failed-logins-and-locked-accounts.sql) | Failed logins from the default trace and error log, lock-out status, unlock commands |
 
 ### T-SQL: Monitoring
 

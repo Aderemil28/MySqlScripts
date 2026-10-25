@@ -16,8 +16,13 @@ SELECT
     CAST(r.estimated_completion_time / 60000.0 AS decimal(10,1)) AS remaining_min,
     DATEADD(MILLISECOND, r.estimated_completion_time, GETDATE()) AS estimated_finish,
     r.wait_type,
-    r.blocking_session_id
+    CAST(r.wait_time / 1000.0 AS decimal(10,1))                  AS wait_sec,
+    r.blocking_session_id,
+    r.reads,
+    r.writes,
+    t.text                                                       AS sql_text
 FROM sys.dm_exec_requests AS r
+OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) AS t
 WHERE r.command LIKE N'BACKUP%'
    OR r.command LIKE N'RESTORE%'
    OR r.command LIKE N'DBCC%'
