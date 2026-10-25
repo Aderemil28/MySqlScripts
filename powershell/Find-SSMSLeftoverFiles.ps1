@@ -10,19 +10,29 @@
       - old install folders
     Files written at or after -UpgradeTime are marked as "Upgraded" because they
     came from the new install, not the old one. This avoids false positives from
-    unrelated components that share a similar version number.
+    unrelated components that share a similar version number (for example
+    Analysis Services DLLs versioned 22.1.x inside an SSMS 22.11 install).
 
 .PARAMETER OldVersionPrefix
     Version prefix of the old build, for example '22.1.'.
 
 .PARAMETER UpgradeTime
-    When the upgrade finished. Files written after this are treated as new.
+    When the upgrade STARTED. Files written after this are treated as new.
+    (Using the finish time would flag files written during the upgrade.)
+    If omitted, every match is reported as a possible leftover.
+
+.PARAMETER InstallPath
+    SSMS install folder, when it isn't under C:\Program Files (for example
+    'D:\Program Files\Microsoft SQL Server Management Studio 22'). Get it from
+    Get-SSMSInstallInfo.ps1. Searched in addition to the default folders.
 
 .PARAMETER OutputPath
     CSV report path.
 
 .EXAMPLE
     .\Find-SSMSLeftoverFiles.ps1 -OldVersionPrefix '22.1.' -UpgradeTime '2026-10-20 14:30'
+    .\Find-SSMSLeftoverFiles.ps1 -OldVersionPrefix '22.1.' -UpgradeTime '2026-10-20 14:30' `
+        -InstallPath 'D:\Program Files\Microsoft SQL Server Management Studio 22'
 
 .NOTES
     Read-only. Run elevated so protected folders can be read.
@@ -30,15 +40,17 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$OldVersionPrefix,
-    [datetime]$UpgradeTime = (Get-Date).AddYears(-10),
+    [datetime]$UpgradeTime = [datetime]::MaxValue,   # not given = treat every match as a possible leftover
+    [string]$InstallPath,
     [string]$OutputPath = "C:\Temp\SSMS_leftovers_$($env:COMPUTERNAME).csv"
 )
 
 $roots = @(
     "${env:ProgramFiles}\Microsoft SQL Server Management Studio*",
     "${env:ProgramFiles(x86)}\Microsoft SQL Server Management Studio*",
-    "${env:ProgramData}\Microsoft\VisualStudio\Packages"
-) | Where-Object { Test-Path $_ }
+    "${env:ProgramData}\Microsoft\VisualStudio\Packages",
+    $InstallPath
+) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
 
 if (-not $roots) {
     Write-Warning 'No SSMS install or package cache folders found.'
