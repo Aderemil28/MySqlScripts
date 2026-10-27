@@ -42,6 +42,7 @@ tsql/
   storage/          disk space, file sizes, log space, pre-growth, growth diagnostics, log shrink
 powershell/         server-side troubleshooting and inventory scripts
 robocopy/           backup file copy wrapper and Robocopy cheat sheet
+excel/              Excel macro for Agent job reports
 cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 ```
 
@@ -61,6 +62,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [connection-strings-by-database.sql](tsql/alwayson/connection-strings-by-database.sql) | Suggested connection string per database (listener + MultiSubnetFailover for AG databases) |
 | [create-availability-group-template.sql](tsql/alwayson/create-availability-group-template.sql) | SQLCMD-mode template to build a two-replica AG with a listener |
 | [job-step-run-only-on-primary.sql](tsql/alwayson/job-step-run-only-on-primary.sql) | Guard step so a job only runs on the primary replica |
+| [databases-topology-and-role.sql](tsql/alwayson/databases-topology-and-role.sql) | Every user database: standalone or AG member, and primary or secondary on this replica |
 | [ag-health-monitoring/](tsql/alwayson/ag-health-monitoring) | Three scripts that log AG health every 15 minutes, purge old rows, and email a daily summary |
 
 ### T-SQL: Backup and restore
@@ -81,6 +83,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [script-out-logins-sp_help_revlogin.sql](tsql/security/script-out-logins-sp_help_revlogin.sql) | Microsoft's sp_help_revlogin with server roles, to copy logins with original SIDs and passwords |
 | [script-out-all-logins-roles-and-users.sql](tsql/security/script-out-all-logins-roles-and-users.sql) | Logins, server roles, and users/roles in every database in one script |
 | [script-out-database-users-and-permissions.sql](tsql/security/script-out-database-users-and-permissions.sql) | Re-runnable script of one database's users, roles and permissions (run before a refresh) |
+| [script-out-server-permissions.sql](tsql/security/script-out-server-permissions.sql) | GRANT/DENY statements for every server-level permission, including endpoint and login targets |
 | [orphaned-users-find.sql](tsql/security/orphaned-users-find.sql) | Orphaned users in the current database and across all databases |
 | [orphaned-users-fix.sql](tsql/security/orphaned-users-fix.sql) | Re-maps orphaned users to the matching login (ALTER USER WITH LOGIN) |
 | [orphaned-users-drop.sql](tsql/security/orphaned-users-drop.sql) | Drops orphaned users, preview first |
@@ -101,6 +104,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [blocking-chain.sql](tsql/monitoring/blocking-chain.sql) | Lead blockers and every blocked request with SQL text |
 | [active-requests.sql](tsql/monitoring/active-requests.sql) | Everything running now, heaviest first, with waits, I/O, memory grant, blocking and the plan (sp_WhoIsActive alternative) |
 | [top-cpu-queries.sql](tsql/monitoring/top-cpu-queries.sql) | Cached queries using the most CPU, with averages, reads, statement text and plan |
+| [queries-in-time-window.sql](tsql/monitoring/queries-in-time-window.sql) | Cached statements for one database that last ran in a given time window |
 | [sessions-by-database-host-or-program.sql](tsql/monitoring/sessions-by-database-host-or-program.sql) | Who is connected, filtered by database, host, program or login |
 | [cpu-utilization-history.sql](tsql/monitoring/cpu-utilization-history.sql) | SQL Server vs other process CPU, minute by minute for about 4 hours |
 | [cpu-scheduler-pressure.sql](tsql/monitoring/cpu-scheduler-pressure.sql) | Runnable task queues and signal wait percentage |
@@ -121,6 +125,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [database-file-sizes-and-free-space.sql](tsql/storage/database-file-sizes-and-free-space.sql) | Size, used, free and % used for every file, with growth settings |
 | [drive-usage-db-files-vs-other.sql](tsql/storage/drive-usage-db-files-vs-other.sql) | Per drive: how much database files use versus everything else, plus per-file resize commands |
 | [table-sizes-all-databases.sql](tsql/storage/table-sizes-all-databases.sql) | Largest tables across all databases: data, index and LOB space, and row counts |
+| [largest-databases.sql](tsql/storage/largest-databases.sql) | Databases ranked by allocated size, data and log split, in MB, GB and TB |
 | [log-space-and-reuse-wait.sql](tsql/storage/log-space-and-reuse-wait.sql) | Log size, % used and why the log will not truncate |
 | [pre-grow-data-files.sql](tsql/storage/pre-grow-data-files.sql) | Pre-grows data files by a percentage with BEFORE and AFTER evidence for change records |
 | [file-growth-diagnostic-toolkit.sql](tsql/storage/file-growth-diagnostic-toolkit.sql) | Autogrowth settings, growth trend, growth events, IFI and the fix |
@@ -159,6 +164,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [Get-SSMSInstallInfo.ps1](powershell/Get-SSMSInstallInfo.ps1) | Reports SSMS versions (including SSMS 21+) and upgrades in place |
 | [Find-SSMSLeftoverFiles.ps1](powershell/Find-SSMSLeftoverFiles.ps1) | Scans for binaries left over from an old SSMS version after an upgrade |
 | [Get-SqlServerEdition.ps1](powershell/Get-SqlServerEdition.ps1) | Edition, version and patch level of every instance from the registry, local or remote |
+| [Get-InstalledSoftware.ps1](powershell/Get-InstalledSoftware.ps1) | Installed software from the registry on one or many servers, with optional CSV per server |
 
 ### Robocopy
 
@@ -166,6 +172,12 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 |---|---|
 | [Copy-BackupFiles.ps1](robocopy/Copy-BackupFiles.ps1) | Robocopy wrapper for backup files: restartable, retries, logging, dry run, exit-code check |
 | [robocopy-cheatsheet.md](robocopy/robocopy-cheatsheet.md) | Commands, switches, exit codes and the SQL Agent exit-code wrapper |
+
+### Excel
+
+| File | What it does |
+|---|---|
+| [Convert-AgentJobColumns.bas](excel/Convert-AgentJobColumns.bas) | VBA macro that turns Agent job integer times, dates and durations pasted into Excel into readable values |
 
 ### Cheat sheets
 
