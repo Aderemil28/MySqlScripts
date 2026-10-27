@@ -92,12 +92,14 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [encryption-tde-keys-and-certificates.sql](tsql/security/encryption-tde-keys-and-certificates.sql) | TDE status per database, certificate expiry, keys |
 | [clr-assemblies-and-trustworthy.sql](tsql/security/clr-assemblies-and-trustworthy.sql) | CLR settings, TRUSTWORTHY databases and user assemblies |
 | [failed-logins-and-locked-accounts.sql](tsql/security/failed-logins-and-locked-accounts.sql) | Failed logins from the default trace and error log, lock-out status, unlock commands |
+| [sql-login-policy-audit.sql](tsql/security/sql-login-policy-audit.sql) | Audit findings: sysadmin SQL logins with no expiry, logins with password policy off, remote access setting |
 
 ### T-SQL: Monitoring
 
 | Script | What it does |
 |---|---|
 | [blocking-chain.sql](tsql/monitoring/blocking-chain.sql) | Lead blockers and every blocked request with SQL text |
+| [active-requests.sql](tsql/monitoring/active-requests.sql) | Everything running now, heaviest first, with waits, I/O, memory grant, blocking and the plan (sp_WhoIsActive alternative) |
 | [top-cpu-queries.sql](tsql/monitoring/top-cpu-queries.sql) | Cached queries using the most CPU, with averages, reads, statement text and plan |
 | [sessions-by-database-host-or-program.sql](tsql/monitoring/sessions-by-database-host-or-program.sql) | Who is connected, filtered by database, host, program or login |
 | [cpu-utilization-history.sql](tsql/monitoring/cpu-utilization-history.sql) | SQL Server vs other process CPU, minute by minute for about 4 hours |
@@ -117,6 +119,8 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [disk-space-by-volume.sql](tsql/storage/disk-space-by-volume.sql) | Volume size and free space in GB, plus xp_fixeddrives |
 | [disk-space-alert-check.sql](tsql/storage/disk-space-alert-check.sql) | Only the volumes below a free-space threshold |
 | [database-file-sizes-and-free-space.sql](tsql/storage/database-file-sizes-and-free-space.sql) | Size, used, free and % used for every file, with growth settings |
+| [drive-usage-db-files-vs-other.sql](tsql/storage/drive-usage-db-files-vs-other.sql) | Per drive: how much database files use versus everything else, plus per-file resize commands |
+| [table-sizes-all-databases.sql](tsql/storage/table-sizes-all-databases.sql) | Largest tables across all databases: data, index and LOB space, and row counts |
 | [log-space-and-reuse-wait.sql](tsql/storage/log-space-and-reuse-wait.sql) | Log size, % used and why the log will not truncate |
 | [pre-grow-data-files.sql](tsql/storage/pre-grow-data-files.sql) | Pre-grows data files by a percentage with BEFORE and AFTER evidence for change records |
 | [file-growth-diagnostic-toolkit.sql](tsql/storage/file-growth-diagnostic-toolkit.sql) | Autogrowth settings, growth trend, growth events, IFI and the fix |
@@ -130,10 +134,14 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [jobs-schedule-and-next-run.sql](tsql/agent-jobs/jobs-schedule-and-next-run.sql) | Every job with schedule, next run and last outcome |
 | [job-steps-search.sql](tsql/agent-jobs/job-steps-search.sql) | Finds job steps that mention a keyword (remoting, xp_cmdshell, old servers) |
 | [ola-hallengren-job-schedules.sql](tsql/agent-jobs/ola-hallengren-job-schedules.sql) | Schedules for the Ola Hallengren Maintenance Solution jobs |
+| [create-msdb-history-purge-job.sql](tsql/agent-jobs/create-msdb-history-purge-job.sql) | One nightly job that purges msdb backup and job history older than N days |
 | [add-primary-key-to-heaps.sql](tsql/maintenance/add-primary-key-to-heaps.sql) | Lists tables with no primary key and generates surrogate keys, preview first |
 | [kill-sessions-for-database.sql](tsql/maintenance/kill-sessions-for-database.sql) | Clears connections from a database before a restore or rename |
 | [schema-object-counts.sql](tsql/maintenance/schema-object-counts.sql) | Object counts and row counts to compare source and target after a migration |
 | [find-invalid-xml-in-columns.sql](tsql/maintenance/find-invalid-xml-in-columns.sql) | Finds rows where an XML config column no longer parses as XML |
+| [msdb-history-cleanup.sql](tsql/maintenance/msdb-history-cleanup.sql) | One-off cleanup of a large msdb: size, oldest history, purge in weekly chunks, preview first |
+| [missing-index-suggestions.sql](tsql/maintenance/missing-index-suggestions.sql) | Optimizer's missing index requests ranked by benefit, with CREATE INDEX statements to review |
+| [duplicate-indexes.sql](tsql/maintenance/duplicate-indexes.sql) | Exact duplicate and overlapping indexes in a database |
 | [log-shipping-status.sql](tsql/log-shipping/log-shipping-status.sql) | Last backup, copy and restore with minutes since each |
 
 ### PowerShell
@@ -150,6 +158,7 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [Find-PythonRuntime.ps1](powershell/Find-PythonRuntime.ps1) | Finds Python runtimes on a server and which process has them loaded |
 | [Get-SSMSInstallInfo.ps1](powershell/Get-SSMSInstallInfo.ps1) | Reports SSMS versions (including SSMS 21+) and upgrades in place |
 | [Find-SSMSLeftoverFiles.ps1](powershell/Find-SSMSLeftoverFiles.ps1) | Scans for binaries left over from an old SSMS version after an upgrade |
+| [Get-SqlServerEdition.ps1](powershell/Get-SqlServerEdition.ps1) | Edition, version and patch level of every instance from the registry, local or remote |
 
 ### Robocopy
 
