@@ -166,6 +166,21 @@ cheatsheets/        quick references (T-SQL, sp_WhoIsActive, third-party tools)
 | [Get-SqlServerEdition.ps1](powershell/Get-SqlServerEdition.ps1) | Edition, version and patch level of every instance from the registry, local or remote |
 | [Get-InstalledSoftware.ps1](powershell/Get-InstalledSoftware.ps1) | Installed software from the registry on one or many servers, with optional CSV per server |
 
+### PowerShell: AG-aware patching and SSMS updates
+
+Rolling patching for availability groups, including two AGs linked by a distributed AG: secondary
+first, planned failover, then the old primary, with a health check between every step. All three
+patching scripts are dry runs until you add `-Execute`. Run them from a machine that is not one of
+the nodes. Walkthrough: [Patch an AG or distributed AG in rolling order](https://github.com/Aderemil28/sql-server-docs/blob/main/docs/install/patch-ag-dag-rolling.md).
+
+| Script | What it does |
+|---|---|
+| [Invoke-SQLPatching.ps1](powershell/Invoke-SQLPatching.ps1) | Installs a SQL Server CU or GDR one node at a time, DAG secondary side first, skips nodes already on the target build |
+| [Invoke-AGPatching.ps1](powershell/Invoke-AGPatching.ps1) | Same rolling order for Windows updates, through a SYSTEM task on each node; skips SQL and Defender definition updates |
+| [Get-AGStatusReport.ps1](powershell/Get-AGStatusReport.ps1) | Roles, commit and failover mode, sync state and queues for every AG and DAG database, with an HTML copy; runs after every patch |
+| [Update-SSMS.ps1](powershell/Update-SSMS.ps1) | Downloads the latest SSMS 22 and silently updates it on many servers, with a before/after table |
+| [Register-SSMSAutoUpdate.ps1](powershell/Register-SSMSAutoUpdate.ps1) | Scheduled task that runs Update-SSMS.ps1 every N weeks, with a log per run |
+
 ### Robocopy
 
 | File | What it does |
