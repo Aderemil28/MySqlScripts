@@ -438,21 +438,25 @@ if ($runDiag) {
     }
     else { Write-Host "`nNo problems found by the diagnostics." -ForegroundColor Green }
 
-    # Built key by key: Windows PowerShell 5.1 throws "Argument types do not match" on an
-    # [ordered] literal whose keys contain variables.
-    $sections = [ordered]@{}
-    $sections['Cluster nodes']                     = $diag.ClusterNodes
-    $sections['AG cluster resources']              = $diag.AGResources
-    $sections['Quorum (as each node sees it)']     = $diag.Quorum
-    $sections['Replicas (as each node sees them)'] = @($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime)
-    $sections['Databases (local view per node)']   = $diag.NodeDatabases
-    $sections['Mirroring endpoints']               = $diag.Endpoints
-    $sections["Cluster events (last $ErrorLogHours h)"] = $diag.ClusterEvents
-    $sections["SQL error log, Always On related (last $ErrorLogHours h)"] = $diag.ErrorLog
-    foreach ($k in $sections.Keys) {
-        if (@($sections[$k]).Count) {
-            Write-Host "`n$k" -ForegroundColor Cyan
-            $sections[$k] | Format-Table -AutoSize -Wrap | Out-String -Width 250 | Write-Host
+    # Plain list of title/rows pairs (no ordered dictionary: Windows PowerShell 5.1 has trouble with those here)
+    $sections = @(
+        [pscustomobject]@{ Title = 'Cluster nodes';                     Rows = @($diag.ClusterNodes) }
+        [pscustomobject]@{ Title = 'AG cluster resources';              Rows = @($diag.AGResources) }
+        [pscustomobject]@{ Title = 'Quorum (as each node sees it)';     Rows = @($diag.Quorum) }
+        [pscustomobject]@{ Title = 'Replicas (as each node sees them)'; Rows = @($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime) }
+        [pscustomobject]@{ Title = 'Databases (local view per node)';   Rows = @($diag.NodeDatabases) }
+        [pscustomobject]@{ Title = 'Mirroring endpoints';               Rows = @($diag.Endpoints) }
+        [pscustomobject]@{ Title = ('Cluster events (last {0} h)' -f $ErrorLogHours);                   Rows = @($diag.ClusterEvents) }
+        [pscustomobject]@{ Title = ('SQL error log, Always On related (last {0} h)' -f $ErrorLogHours); Rows = @($diag.ErrorLog) }
+    )
+    foreach ($sec in $sections) {
+        if ($sec.Rows.Count) {
+            Write-Host "`n$($sec.Title)" -ForegroundColor Cyan
+            try   { $sec.Rows | Format-Table -AutoSize -Wrap | Out-String -Width 250 | Write-Host }
+            catch {
+                Write-Host "  (table view failed: $($_.Exception.Message); showing as a list)" -ForegroundColor DarkYellow
+                $sec.Rows | Format-List | Out-String -Width 250 | Write-Host
+            }
         }
     }
 }
@@ -475,8 +479,11 @@ th { background: #f0f0f0; } .ok { color: #1a7f37; font-weight: bold; } .bad { co
             "<h2>Databases</h2>" + ($databases | ConvertTo-Html -Fragment | Out-String)
     if ($runDiag) {
         $body += "<h2>Likely causes</h2>" + ($causes | ConvertTo-Html -Fragment | Out-String)
-        foreach ($k in $sections.Keys) {
-            if (@($sections[$k]).Count) { $body += "<h2>$k</h2>" + ($sections[$k] | ConvertTo-Html -Fragment | Out-String) }
+        foreach ($sec in $sections) {
+            if ($sec.Rows.Count) {
+                try   { $body += "<h2>$($sec.Title)</h2>" + ($sec.Rows | ConvertTo-Html -Fragment | Out-String) }
+                catch { $body += "<h2>$($sec.Title)</h2><p>Could not render: $([System.Net.WebUtility]::HtmlEncode($_.Exception.Message))</p>" }
+            }
         }
     }
     ConvertTo-Html -Head $style -Body $body -Title 'AG status report' | Set-Content -Path $htmlPath -Encoding UTF8
