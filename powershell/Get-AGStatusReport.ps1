@@ -269,12 +269,19 @@ LEFT JOIN sys.tcp_endpoints t ON e.endpoint_id = t.endpoint_id;
 SET NOCOUNT ON;
 CREATE TABLE #el (LogDate datetime, ProcessInfo nvarchar(100), [Text] nvarchar(max));
 INSERT #el EXEC master.dbo.xp_readerrorlog 0, 1;
-SELECT TOP (20) LogDate, [Text]
+SELECT TOP (25) LogDate, [Text]
 FROM #el
 WHERE LogDate >= DATEADD(HOUR, -$ErrorLogHours, GETDATE())
   AND (   [Text] LIKE '%changing roles%' OR [Text] LIKE '%availability group%' OR [Text] LIKE '%Always On%'
        OR [Text] LIKE '%lease%' OR [Text] LIKE '%quorum%' OR [Text] LIKE '%mirroring%' OR [Text] LIKE '%endpoint%'
-       OR [Text] LIKE '%Error: 354%' OR [Text] LIKE '%Error: 1480%' OR [Text] LIKE '%Error: 1947%' OR [Text] LIKE '%Error: 4114%')
+       OR [Text] LIKE '%seeding%' OR [Text] LIKE '%suspend%' OR [Text] LIKE '%redo%' OR [Text] LIKE '%timeout%')
+  -- noise: debug traces, successful logins, informational 'already joined' (error 41145) messages
+  AND [Text] NOT LIKE '%DebugTraceVarArgs%'
+  AND [Text] NOT LIKE '%Login succeeded%'
+  AND [Text] NOT LIKE '%Service Broker endpoint%'
+  AND [Text] NOT LIKE '%has already joined the availability group%'
+  AND [Text] NOT LIKE 'Error: 41145%'
+  AND [Text] NOT LIKE '%This is an informational message only%'
 ORDER BY LogDate DESC;
 DROP TABLE #el;
 "@
@@ -356,6 +363,20 @@ DROP TABLE #el;
         Add-Cause "$($res.Cluster) / $($res.Resource)" "AG cluster resource is $($res.State) (owner $($res.OwnerNode))." "Read the cluster events and the SQL error log on $($res.OwnerNode) below for why it went $($res.State). Once the cause is fixed: Start-ClusterResource -Name '$($res.Resource)'"
     }
 
+    # Repeated AG resource failures / failover threshold reached (from the cluster events)
+    foreach ($clName in @($diag.ClusterEvents | ForEach-Object { $_.Cluster } | Select-Object -Unique)) {
+        $evts      = @($diag.ClusterEvents | Where-Object { $_.Cluster -eq $clName })
+        $failed    = @($evts | Where-Object { $_.Id -eq 1069 })
+        $threshold = @($evts | Where-Object { $_.Id -eq 1254 })
+        if ($failed.Count -ge 2 -or $threshold.Count -ge 1) {
+            $first = ($failed | Sort-Object Time | Select-Object -First 1).Time
+            $last  = ($evts   | Sort-Object Time -Descending | Select-Object -First 1).Time
+            $msg = "AG resource failed $($failed.Count) times in the last $ErrorLogHours h (first $first, latest $last)"
+            if ($threshold.Count) { $msg += "; the cluster hit the failover threshold $($threshold.Count) time(s) and left the role failed (event 1254)" }
+            Add-Cause $clName ($msg + ".") "Repeated failures on a schedule like this usually mean the nodes are being paused or starved: the VM host sleeping or suspending, snapshots, low memory or CPU, so lease and health-check timeouts are missed. Check the host first, then: Get-ClusterLog -TimeSpan 120 -Destination C:\Temp"
+        }
+    }
+
     # RESOLVING
     foreach ($nr in ($diag.NodeReplicas | Where-Object { $_.IsLocal -and $_.Role -eq 'RESOLVING' })) {
         Add-Cause "$($nr.AGName) / $($nr.Node)" "Replica is RESOLVING: it doesn't know whether it is primary or secondary." "Usually a cluster problem (lost quorum, lease timeout, AG resource offline). Check the cluster findings first."
@@ -383,7 +404,17 @@ DROP TABLE #el;
             Add-Cause "$($nd.AGName) / $($nd.Node) / $($nd.DatabaseName)" "Database is $($nd.DatabaseState)." "If RECOVERING, give it time and watch the error log. If RECOVERY_PENDING or SUSPECT, check the error log for the file or log error behind it."
         }
         if ($nd.IsSuspended -eq $true) {
-            Add-Cause "$($nd.AGName) / $($nd.Node) / $($nd.DatabaseName)" "Data movement is SUSPENDED (reason: $($nd.SuspendReason))." "Fix the reason first (see the error log), then on $($nd.Node): ALTER DATABASE [$($nd.DatabaseName)] SET HADR RESUME;"
+            $resume = "ALTER DATABASE [$($nd.DatabaseName)] SET HADR RESUME;  (run on $($nd.Node))"
+            $why = switch ($nd.SuspendReason) {
+                'SUSPEND_FROM_USER'     { "Someone suspended it by hand. If that work is finished: $resume" }
+                'SUSPEND_FROM_RESTART'  { "It was suspended when SQL Server restarted. If nothing in the error log points to a database problem: $resume" }
+                'SUSPEND_FROM_REDO'     { "Redo hit an error while applying log. Check the error log on $($nd.Node) for the error (disk space, file, corruption), fix it, then: $resume" }
+                'SUSPEND_FROM_UNDO'     { "Undo hit an error after a failover. Check the error log on $($nd.Node), fix it, then: $resume" }
+                'SUSPEND_FROM_CAPTURE'  { "Log capture on the primary hit an error. Check the error log on $($nd.Node), fix it, then: $resume" }
+                'SUSPEND_FROM_APPLY'    { "Applying log on the secondary hit an error. Check the error log on $($nd.Node), fix it, then: $resume" }
+                default                 { "Fix the reason first (see the error log), then: $resume" }
+            }
+            Add-Cause "$($nd.AGName) / $($nd.Node) / $($nd.DatabaseName)" "Data movement is SUSPENDED (reason: $($nd.SuspendReason))." $why
         }
     }
 
