@@ -177,7 +177,8 @@ the nodes. Walkthrough: [Patch an AG or distributed AG in rolling order](https:/
 |---|---|
 | [Invoke-SQLPatching.ps1](powershell/Invoke-SQLPatching.ps1) | Installs a SQL Server CU or GDR one node at a time, DAG secondary side first, skips nodes already on the target build |
 | [Invoke-AGPatching.ps1](powershell/Invoke-AGPatching.ps1) | Same rolling order for Windows updates, through a SYSTEM task on each node; skips SQL and Defender definition updates |
-| [Get-AGStatusReport.ps1](powershell/Get-AGStatusReport.ps1) | Roles, commit and failover mode, sync state and queues for every AG and DAG database, with an HTML copy; runs after every patch |
+| [Get-AGStatusReport.ps1](powershell/Get-AGStatusReport.ps1) | Roles, commit and failover mode, sync state and queues for every AG and DAG database, with an HTML copy; runs after every patch. When anything is unhealthy it diagnoses why: cluster node down, quarantined or isolated, quorum, AG resource, endpoints, replica connection errors, suspended data movement, unexpected failover with the reason from the error log, and cluster events, with the fix to try first |
+| [ag-config.example.psd1](powershell/ag-config.example.psd1) | Example settings file so Get-AGStatusReport.ps1 runs with no parameters; copy to ag-config.psd1 (ignored by Git) |
 | [Update-SSMS.ps1](powershell/Update-SSMS.ps1) | Downloads the latest SSMS 22 and silently updates it on many servers, with a before/after table |
 | [Register-SSMSAutoUpdate.ps1](powershell/Register-SSMSAutoUpdate.ps1) | Scheduled task that runs Update-SSMS.ps1 every N weeks, with a log per run |
 

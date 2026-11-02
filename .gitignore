@@ -12,3 +12,5 @@ servers.txt
 *.swp
 Thumbs.db
 .DS_Store
+# Local AG settings for Get-AGStatusReport.ps1 (real server names)
+ag-config.psd1
