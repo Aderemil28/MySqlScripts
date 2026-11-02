@@ -438,16 +438,17 @@ if ($runDiag) {
     }
     else { Write-Host "`nNo problems found by the diagnostics." -ForegroundColor Green }
 
-    $sections = [ordered]@{
-        'Cluster nodes'                    = $diag.ClusterNodes
-        'AG cluster resources'             = $diag.AGResources
-        'Quorum (as each node sees it)'    = $diag.Quorum
-        'Replicas (as each node sees them)'= ($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime)
-        'Databases (local view per node)'  = $diag.NodeDatabases
-        'Mirroring endpoints'              = $diag.Endpoints
-        "Cluster events (last $ErrorLogHours h)"   = $diag.ClusterEvents
-        "SQL error log, Always On related (last $ErrorLogHours h)" = $diag.ErrorLog
-    }
+    # Built key by key: Windows PowerShell 5.1 throws "Argument types do not match" on an
+    # [ordered] literal whose keys contain variables.
+    $sections = [ordered]@{}
+    $sections['Cluster nodes']                     = $diag.ClusterNodes
+    $sections['AG cluster resources']              = $diag.AGResources
+    $sections['Quorum (as each node sees it)']     = $diag.Quorum
+    $sections['Replicas (as each node sees them)'] = @($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime)
+    $sections['Databases (local view per node)']   = $diag.NodeDatabases
+    $sections['Mirroring endpoints']               = $diag.Endpoints
+    $sections["Cluster events (last $ErrorLogHours h)"] = $diag.ClusterEvents
+    $sections["SQL error log, Always On related (last $ErrorLogHours h)"] = $diag.ErrorLog
     foreach ($k in $sections.Keys) {
         if (@($sections[$k]).Count) {
             Write-Host "`n$k" -ForegroundColor Cyan
