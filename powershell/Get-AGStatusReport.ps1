@@ -88,6 +88,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Any unexpected error: say exactly where, so it can be fixed, instead of a bare message.
+trap {
+    Write-Host ("`nGet-AGStatusReport stopped at line {0}: {1}" -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message) -ForegroundColor Red
+    Write-Host ("  {0}" -f $_.InvocationInfo.Line.Trim()) -ForegroundColor DarkGray
+    break
+}
+
 # ---------------------------------------------------------------- configuration
 
 if (-not $AvailabilityGroups) {
@@ -438,26 +445,46 @@ if ($runDiag) {
     }
     else { Write-Host "`nNo problems found by the diagnostics." -ForegroundColor Green }
 
-    # Plain list of title/rows pairs (no ordered dictionary: Windows PowerShell 5.1 has trouble with those here)
-    $sections = @(
-        [pscustomobject]@{ Title = 'Cluster nodes';                     Rows = @($diag.ClusterNodes) }
-        [pscustomobject]@{ Title = 'AG cluster resources';              Rows = @($diag.AGResources) }
-        [pscustomobject]@{ Title = 'Quorum (as each node sees it)';     Rows = @($diag.Quorum) }
-        [pscustomobject]@{ Title = 'Replicas (as each node sees them)'; Rows = @($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime) }
-        [pscustomobject]@{ Title = 'Databases (local view per node)';   Rows = @($diag.NodeDatabases) }
-        [pscustomobject]@{ Title = 'Mirroring endpoints';               Rows = @($diag.Endpoints) }
-        [pscustomobject]@{ Title = ('Cluster events (last {0} h)' -f $ErrorLogHours);                   Rows = @($diag.ClusterEvents) }
-        [pscustomobject]@{ Title = ('SQL error log, Always On related (last {0} h)' -f $ErrorLogHours); Rows = @($diag.ErrorLog) }
-    )
-    foreach ($sec in $sections) {
-        if ($sec.Rows.Count) {
-            Write-Host "`n$($sec.Title)" -ForegroundColor Cyan
-            try   { $sec.Rows | Format-Table -AutoSize -Wrap | Out-String -Width 250 | Write-Host }
-            catch {
-                Write-Host "  (table view failed: $($_.Exception.Message); showing as a list)" -ForegroundColor DarkYellow
-                $sec.Rows | Format-List | Out-String -Width 250 | Write-Host
+    # Detail tables. Each one is shown on its own and guarded, so a display problem in one table
+    # never stops the report; if a table can't be drawn its rows are printed as plain lines.
+    $sectionTitles = New-Object System.Collections.Generic.List[string]
+    $sectionRows   = New-Object System.Collections.Generic.List[object]
+    function Add-Section([string]$Title, $Rows) { $sectionTitles.Add($Title); $sectionRows.Add($Rows) }
+    function Show-Section([string]$Title, $Rows) {
+        $list = New-Object System.Collections.Generic.List[object]
+        foreach ($r in $Rows) { $list.Add($r) }
+        if ($list.Count -eq 0) { return }
+        Write-Host ""
+        Write-Host $Title -ForegroundColor Cyan
+        try {
+            $text = $list | Format-Table -AutoSize -Wrap | Out-String -Width 250
+            Write-Host $text
+        }
+        catch {
+            Write-Host ("  (table view failed at line {0}: {1}; plain view below)" -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message) -ForegroundColor DarkYellow
+            foreach ($r in $list) {
+                $parts = foreach ($p in $r.PSObject.Properties) { "{0}={1}" -f $p.Name, $p.Value }
+                Write-Host ("  " + ($parts -join ' | '))
             }
         }
+    }
+
+    try {
+        Add-Section 'Cluster nodes'                     $diag.ClusterNodes
+        Add-Section 'AG cluster resources'              $diag.AGResources
+        Add-Section 'Quorum (as each node sees it)'     $diag.Quorum
+        Add-Section 'Replicas (as each node sees them)' ($diag.NodeReplicas | Select-Object Node, AGName, Replica, Role, OperationalState, RecoveryHealth, Connected, Health, LastErrNo, LastErrTime)
+        Add-Section 'Databases (local view per node)'   $diag.NodeDatabases
+        Add-Section 'Mirroring endpoints'               $diag.Endpoints
+        Add-Section ('Cluster events (last {0} h)' -f $ErrorLogHours)                   $diag.ClusterEvents
+        Add-Section ('SQL error log, Always On related (last {0} h)' -f $ErrorLogHours) $diag.ErrorLog
+        for ($i = 0; $i -lt $sectionTitles.Count; $i++) {
+            try { Show-Section $sectionTitles[$i] $sectionRows[$i] }
+            catch { Write-Host ("  Could not show '{0}' (line {1}): {2}" -f $sectionTitles[$i], $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message) -ForegroundColor DarkYellow }
+        }
+    }
+    catch {
+        Write-Host ("`nDiagnostic tables failed at line {0}: {1}" -f $_.InvocationInfo.ScriptLineNumber, $_.Exception.Message) -ForegroundColor DarkYellow
     }
 }
 
@@ -479,11 +506,9 @@ th { background: #f0f0f0; } .ok { color: #1a7f37; font-weight: bold; } .bad { co
             "<h2>Databases</h2>" + ($databases | ConvertTo-Html -Fragment | Out-String)
     if ($runDiag) {
         $body += "<h2>Likely causes</h2>" + ($causes | ConvertTo-Html -Fragment | Out-String)
-        foreach ($sec in $sections) {
-            if ($sec.Rows.Count) {
-                try   { $body += "<h2>$($sec.Title)</h2>" + ($sec.Rows | ConvertTo-Html -Fragment | Out-String) }
-                catch { $body += "<h2>$($sec.Title)</h2><p>Could not render: $([System.Net.WebUtility]::HtmlEncode($_.Exception.Message))</p>" }
-            }
+        for ($i = 0; $i -lt $sectionTitles.Count; $i++) {
+            try   { $body += "<h2>$($sectionTitles[$i])</h2>" + ($sectionRows[$i] | ConvertTo-Html -Fragment | Out-String) }
+            catch { $body += "<h2>$($sectionTitles[$i])</h2><p>Could not render: $([System.Net.WebUtility]::HtmlEncode($_.Exception.Message))</p>" }
         }
     }
     ConvertTo-Html -Head $style -Body $body -Title 'AG status report' | Set-Content -Path $htmlPath -Encoding UTF8
