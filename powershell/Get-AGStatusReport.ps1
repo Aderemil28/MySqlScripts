@@ -291,7 +291,7 @@ BEGIN TRY INSERT #el (LogDate, ProcessInfo, [Text]) EXEC master.dbo.xp_readerror
 INSERT #el (LogDate, ProcessInfo, [Text]) EXEC master.dbo.xp_readerrorlog 0, 1;
 
 WITH errs AS (
-    SELECT e.LogDate, SUBSTRING(e.[Text], 8, CHARINDEX(',', e.[Text]) - 8) AS ErrorNo, n.[Text] AS Msg
+    SELECT e.LogDate, SUBSTRING(e.[Text], 8, CASE WHEN CHARINDEX(',', e.[Text]) > 8 THEN CHARINDEX(',', e.[Text]) - 8 ELSE 0 END) AS ErrorNo, n.[Text] AS Msg
     FROM #el e
     JOIN #el n ON n.id = e.id + 1
     WHERE e.[Text] LIKE 'Error: %' AND CHARINDEX(',', e.[Text]) > 8
@@ -337,40 +337,9 @@ DROP TABLE #el;
 
     # ---- per AG: cluster view (each AG of a DAG is its own cluster) ----
     $clusterBlock = {
-        param($hours, $skipLog)
-        Import-Module FailoverClusters -ErrorAction Stop
+        param($hours)
+        Import-Module FailoverClusters -ErrorAction Stop -WarningAction SilentlyContinue
         $cl = Get-Cluster
-
-        # Failure reasons from the cluster log: ERR/WARN lines that explain failures, grouped
-        $reasons = New-Object System.Collections.Generic.List[object]
-        if (-not $skipLog) {
-            try {
-                $dir = Join-Path $env:TEMP 'AGStatusClusterLog'
-                if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
-                New-Item -Path $dir -ItemType Directory | Out-Null
-                Get-ClusterLog -TimeSpan ($hours * 60) -UseLocalTime -Destination $dir | Out-Null
-                $pattern = 'lease|heartbeat is lost|HealthCheckTimeout|not healthy|Connect to SQL Server instance failed|ODBC|-->Failed|ProcessingFailure|removed from the active failover cluster|quorum|failure count|timed out|timeout|failed to'
-                foreach ($f in (Get-ChildItem $dir -Filter *.log)) {
-                    $nodeName = $f.BaseName -replace '_cluster$', ''
-                    $hits = Select-String -Path $f.FullName -Pattern $pattern | ForEach-Object {
-                        $line = $_.Line
-                        if ($line -notmatch '\s(ERR|WARN)\s') { return }
-                        $ts = $null
-                        if ($line -match '::(\d{4}/\d{2}/\d{2}-\d{2}:\d{2}:\d{2})') { $ts = [datetime]::ParseExact($Matches[1], 'yyyy/MM/dd-HH:mm:ss', $null) }
-                        $msg = ($line -replace '^.*?::\S+\s+(INFO|WARN|ERR|DBG)\s+', '').Trim()
-                        [pscustomobject]@{ Time = $ts; Key = ($msg -replace '\d{3,}', '#' -replace '\{[0-9a-fA-F-]+\}', '{id}'); Message = $msg }
-                    }
-                    foreach ($grp in @($hits | Group-Object Key)) {
-                        $items = @($grp.Group | Sort-Object Time)
-                        $last  = $items[$items.Count - 1]
-                        $text  = if ($last.Message.Length -gt 250) { $last.Message.Substring(0, 250) } else { $last.Message }
-                        $reasons.Add([pscustomobject]@{ Node = $nodeName; Times = $grp.Count; First = $items[0].Time; Last = $last.Time; Message = $text })
-                    }
-                }
-            }
-            catch { $reasons.Add([pscustomobject]@{ Node = $env:COMPUTERNAME; Times = 0; First = $null; Last = $null; Message = "Could not read the cluster log: $($_.Exception.Message)" }) }
-        }
-
         [pscustomobject]@{
             Cluster   = $cl.Name
             Nodes     = @(Get-ClusterNode | ForEach-Object {
@@ -380,14 +349,13 @@ DROP TABLE #el;
             Events    = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-FailoverClustering'; StartTime = (Get-Date).AddHours(-$hours) } -MaxEvents 200 -ErrorAction SilentlyContinue |
                             Where-Object { $_.Level -le 3 } |
                             ForEach-Object { [pscustomobject]@{ Time = $_.TimeCreated; Id = $_.Id; Level = $_.LevelDisplayName; Message = (($_.Message -split "`r?`n")[0]) } })
-            Reasons   = @($reasons)
         }
     }
     $clustersSeen = @{}
     foreach ($g in $AvailabilityGroups) {
         $info = $null; $lastErr = $null
         foreach ($n in $g.Nodes) {
-            try { $info = Invoke-Command -ComputerName $n -ScriptBlock $clusterBlock -ArgumentList $ErrorLogHours, $NoClusterLog.IsPresent -ErrorAction Stop; break }
+            try { $info = Invoke-Command -ComputerName $n -ScriptBlock $clusterBlock -ArgumentList $ErrorLogHours -ErrorAction Stop; break }
             catch { $lastErr = $_.Exception.Message }
         }
         if (-not $info) {
@@ -399,7 +367,43 @@ DROP TABLE #el;
         foreach ($x in @($info.Nodes))     { $diag.ClusterNodes.Add([pscustomobject]@{ Cluster = $info.Cluster; Node = $x.Name; State = $x.State; Status = $x.Status }) }
         foreach ($x in @($info.Resources)) { $diag.AGResources.Add([pscustomobject]@{ Cluster = $info.Cluster; Resource = $x.Name; State = $x.State; OwnerNode = $x.OwnerNode }) }
         foreach ($x in @($info.Events))    { $diag.ClusterEvents.Add([pscustomobject]@{ Cluster = $info.Cluster; Time = $x.Time; Id = $x.Id; Level = $x.Level; Message = $x.Message }) }
-        foreach ($x in @($info.Reasons))   { $diag.ClusterLog.Add([pscustomobject]@{ Cluster = $info.Cluster; Node = $x.Node; Times = $x.Times; First = $x.First; Last = $x.Last; Message = $x.Message }) }
+    }
+
+    # ---- per node: failure reasons from that node's own cluster log ----
+    # Each node generates only its own log (Get-ClusterLog -Node <itself>), so remoting needs no
+    # second hop. Only ERR/WARN lines that explain failures are kept, grouped with counts.
+    $clusterLogBlock = {
+        param($hours)
+        Import-Module FailoverClusters -ErrorAction Stop -WarningAction SilentlyContinue
+        $clName = (Get-Cluster).Name
+        $out = Get-ClusterLog -Node $env:COMPUTERNAME -TimeSpan ($hours * 60) -UseLocalTime -WarningAction SilentlyContinue
+        $path = if ($out) { @($out)[0].FullName } else { Join-Path $env:windir 'Cluster\Reports\Cluster.log' }
+        $pattern = 'lease|heartbeat is lost|HealthCheckTimeout|not healthy|Connect to SQL Server instance failed|ODBC|-->Failed|ProcessingFailure|removed from the active failover cluster|quorum|failure count|timed out|timeout|failed to'
+        $hits = Select-String -Path $path -Pattern $pattern | ForEach-Object {
+            $line = $_.Line
+            if ($line -notmatch '\s(ERR|WARN)\s') { return }
+            $ts = $null
+            if ($line -match '::(\d{4}/\d{2}/\d{2}-\d{2}:\d{2}:\d{2})') { $ts = [datetime]::ParseExact($Matches[1], 'yyyy/MM/dd-HH:mm:ss', $null) }
+            $msg = ($line -replace '^.*?::\S+\s+(INFO|WARN|ERR|DBG)\s+', '').Trim()
+            [pscustomobject]@{ Time = $ts; Key = ($msg -replace '\d{3,}', '#' -replace '\{[0-9a-fA-F-]+\}', '{id}'); Message = $msg }
+        }
+        foreach ($grp in @($hits | Group-Object Key)) {
+            $items = @($grp.Group | Sort-Object Time)
+            $last  = $items[$items.Count - 1]
+            $text  = if ($last.Message.Length -gt 250) { $last.Message.Substring(0, 250) } else { $last.Message }
+            [pscustomobject]@{ Cluster = $clName; Node = $env:COMPUTERNAME; Times = $grp.Count; First = $items[0].Time; Last = $last.Time; Message = $text }
+        }
+    }
+    if (-not $NoClusterLog) {
+        foreach ($n in $allNodes) {
+            try {
+                $res = Invoke-Command -ComputerName $n -ScriptBlock $clusterLogBlock -ArgumentList $ErrorLogHours -ErrorAction Stop
+                foreach ($x in @($res)) {
+                    if ($x) { $diag.ClusterLog.Add([pscustomobject]@{ Cluster = $x.Cluster; Node = $x.Node; Times = $x.Times; First = $x.First; Last = $x.Last; Message = $x.Message }) }
+                }
+            }
+            catch { Write-Host "  (could not read the cluster log on ${n}: $($_.Exception.Message))" -ForegroundColor DarkYellow }
+        }
     }
 
     # ---------------------------------------------------------------- likely causes (rules)
