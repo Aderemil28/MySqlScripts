@@ -686,7 +686,7 @@ th { background: #f0f0f0; } .ok { color: #1a7f37; font-weight: bold; } .bad { co
         if ($runDiag) {
             $body += "<h2>Likely causes</h2>" + ($causes | ConvertTo-Html -Fragment | Out-String)
             for ($i = 0; $i -lt $sectionTitles.Count; $i++) {
-                $rows = @($sectionRows[$i])
+                $rows = @($sectionRows[$i] | Where-Object { $_ })
                 if ($rows.Count) { $body += "<h2>$($sectionTitles[$i])</h2>" + ($rows | ConvertTo-Html -Fragment | Out-String) }
             }
         }
